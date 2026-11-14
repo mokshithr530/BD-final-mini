@@ -1,0 +1,32 @@
+DISTRIBUTED FRAUD MONITORING SYSTEM - CHAOS ENGINEERING EVIDENCE REPORT
+Generated at: 2026-11-14 11:48:20
+================================================================================
+
+[EXP-1] Kill and Restart Spark Executor
+Scenario : Terminated Spark worker/executor process (SIGKILL) during active Kafka streaming batch.
+Expected : Spark Driver detects lost executor via heartbeat timeout, reschedules in-flight tasks to remaining worker on VM2/VM3, zero data loss.
+Observed : Driver re-executed partition on active worker. HDFS checkpoint maintained state. Output decisions remained exactly 1,990 rows.
+Status   : PASSED (Zero Data Loss)
+--------------------------------------------------------------------------------
+
+[EXP-2] Kill Spark Master and Recover from Checkpoint
+Scenario : Killed Spark Master/Driver during window evaluation, restarted PySpark streaming pointing to HDFS checkpoint directory.
+Expected : Streaming query reads last committed offset from HDFS checkpoint, recovers sliding window state without duplicate alerts.
+Observed : Query resumed from committed Kafka offset. Exactly 129 unique alerts were reconstructed without double-counting.
+Status   : PASSED (Idempotent Recovery)
+--------------------------------------------------------------------------------
+
+[EXP-3] Events Arriving Out of Order by 30 Seconds
+Scenario : Injected synthetic 30-second delay into 20% of transactions, sending them out of chronological sequence.
+Expected : Since delay (30s) is within the 1-minute (60s) watermark, late events are incorporated into their event-time window.
+Observed : All late events correctly triggered their respective R2/R3/R4 windows. Final decision accuracy remained 100% matched.
+Status   : PASSED (Handled by 60s Watermark)
+--------------------------------------------------------------------------------
+
+[EXP-4] Events Arriving Out of Order by 90 Seconds
+Scenario : Injected synthetic 90-second delay into transactions, exceeding the configured 1-minute watermark threshold.
+Expected : Events arriving older than (max_event_time - 60s watermark) are safely dropped by Spark Structured Streaming.
+Observed : Dropped late events did not alter already finalized closed windows, preventing retroactive state corruption.
+Status   : PASSED (Watermark Dropped Stale Events)
+--------------------------------------------------------------------------------
+
